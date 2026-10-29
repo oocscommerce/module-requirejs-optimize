@@ -10,6 +10,9 @@ const path = require('path');
 const vm = require('vm');
 const acorn = require('acorn');
 
+// ms per requirejs-config.js block; Magento's own run in well under 100 ms
+const CONFIG_BLOCK_TIMEOUT = 5000;
+
 function isObject(v) {
     return v && typeof v === 'object' && !Array.isArray(v);
 }
@@ -61,7 +64,8 @@ function loadRequireConfig(staticDir) {
         for (let attempt = 0; attempt < 20; attempt++) {
             calls = [];
             try {
-                vm.runInContext(code, context, {filename: file});
+                // a block that never ends (e.g. waits for a global in a loop) is skipped like a failing one
+                vm.runInContext(code, context, {filename: file, timeout: CONFIG_BLOCK_TIMEOUT});
                 break;
             } catch (e) {
                 // a global the theme expects from the page (e.g. a flag printed in <head>): undefined, run again
