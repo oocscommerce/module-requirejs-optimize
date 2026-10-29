@@ -15,6 +15,7 @@
         "php": ">=8.1",
         "magento/framework": "*",
         "magento/module-cms": "*",
+        "magento/module-deploy": "*",
         "magento/module-store": "*",
         "magento/module-theme": "*",
         "magento/module-widget": "*"

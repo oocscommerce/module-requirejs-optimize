@@ -13,6 +13,7 @@ use Magento\Framework\Exception\LocalizedException;
 use OOCS\RequireJsOptimize\Model\ContextBuilder;
 use OOCS\RequireJsOptimize\Model\Engine;
 use OOCS\RequireJsOptimize\Model\PageConfig;
+use OOCS\RequireJsOptimize\Model\StaticVersion;
 use OOCS\RequireJsOptimize\Model\TargetList;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -35,6 +36,7 @@ class RunCommand extends Command
      * @param PageConfig $pageConfig
      * @param State $appState
      * @param Engine $engine
+     * @param StaticVersion $staticVersion
      * @param string|null $name
      */
     public function __construct(
@@ -43,6 +45,7 @@ class RunCommand extends Command
         private readonly PageConfig $pageConfig,
         private readonly State $appState,
         private readonly Engine $engine,
+        private readonly StaticVersion $staticVersion,
         ?string $name = null
     ) {
         parent::__construct($name);
@@ -113,6 +116,9 @@ class RunCommand extends Command
                 $result = Command::FAILURE;
             }
         }
+        if ($action !== 'check') {
+            $this->refreshStaticVersion($output);
+        }
         return $result;
     }
 
@@ -130,6 +136,24 @@ class RunCommand extends Command
             'exclude' => $this->pageConfig->getExclude(),
             'entries' => (object)$this->pageConfig->getEntries($pages),
         ];
+    }
+
+    /**
+     * New static content version, so browsers and CDNs load the new requirejs-config.js.
+     *
+     * @param OutputInterface $output
+     * @return void
+     */
+    private function refreshStaticVersion(OutputInterface $output): void
+    {
+        if (!$this->staticVersion->isSigned()) {
+            $output->writeln('<comment>dev/static/sign is off: browsers and CDNs may keep the old'
+                . ' requirejs-config.js until their cache expires.</comment>');
+            return;
+        }
+        $version = $this->staticVersion->refresh();
+        $output->writeln("<comment>Static content version is now {$version}:"
+            . ' flush the full page cache and purge Varnish/CDN.</comment>');
     }
 
     /**
