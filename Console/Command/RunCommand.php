@@ -73,7 +73,13 @@ class RunCommand extends Command
                 '0'
             )
             ->addOption('json', null, InputOption::VALUE_REQUIRED, 'check: write the full report to this file')
-            ->addOption('node', null, InputOption::VALUE_REQUIRED, 'Node.js binary', 'node');
+            ->addOption('node', null, InputOption::VALUE_REQUIRED, 'Node.js binary', 'node')
+            ->addOption(
+                'no-version-refresh',
+                null,
+                InputOption::VALUE_NONE,
+                'build/clean: keep the static content version (refresh it yourself, e.g. in the deploy pipeline)'
+            );
         parent::configure();
     }
 
@@ -110,16 +116,15 @@ class RunCommand extends Command
             ? $this->pageConfig->getPath()
             : 'defaults (bin/magento static:optimize:init to customize)') . '</comment>');
 
-        $result = Command::SUCCESS;
-        foreach ($targets as $target) {
-            if (!$this->runTarget($target, $config, $node, $action, $input, $output)) {
-                $result = Command::FAILURE;
-            }
-        }
-        if ($action !== 'check') {
+        $results = array_map(
+            fn (array $target) => $this->runTarget($target, $config, $node, $action, $input, $output),
+            $targets
+        );
+        // only when static files changed: a new version empties browser and CDN caches of all static files
+        if ($action !== 'check' && in_array(true, $results, true) && !$input->getOption('no-version-refresh')) {
             $this->refreshStaticVersion($output);
         }
-        return $result;
+        return in_array(false, $results, true) ? Command::FAILURE : Command::SUCCESS;
     }
 
     /**
@@ -180,7 +185,7 @@ class RunCommand extends Command
      * @param string $action
      * @param InputInterface $input
      * @param OutputInterface $output
-     * @return bool false when the engine failed
+     * @return bool|null false when the engine failed, null when skipped
      * @throws LocalizedException
      */
     private function runTarget(
@@ -190,13 +195,13 @@ class RunCommand extends Command
         string $action,
         InputInterface $input,
         OutputInterface $output
-    ): bool {
+    ): ?bool {
         $themePath = $target['theme']->getThemePath();
         $label = $themePath . ' / ' . $target['locale'];
         if (!$target['deployed'] || !$target['requireJs']) {
             $reason = $target['deployed'] ? 'theme does not use RequireJS' : 'static content not deployed';
             $output->writeln("<comment>skip {$label}: {$reason}</comment>");
-            return true;
+            return null;
         }
         [$success, $contextFile] = $this->engine->run(
             $node,

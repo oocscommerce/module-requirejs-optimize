@@ -57,11 +57,12 @@ rewrites `requirejs-config.js` and `sri-hashes.json`, which removes the loader.
 
 `build` and `clean` end with a new static content version, as
 `setup:static-content:deploy --refresh-content-version-only` does, so browsers and CDNs load the new
-`requirejs-config.js`. The full page cache and Varnish/CDN are not purged: do it after the run.
+`requirejs-config.js`, unless no theme/locale was built or `--no-version-refresh` is passed. The full
+page cache and Varnish/CDN are not purged: do it after the run.
 
 ```bash
 bin/magento static:optimize:run [build|check|clean] [--theme Vendor/theme] [--locale xx_XX]
-        [--min-chunk 0] [--json report.json] [--node /path/to/node] [-v]
+        [--min-chunk 0] [--json report.json] [--node /path/to/node] [--no-version-refresh] [-v]
 bin/magento static:optimize:init [--force]   # write static-optimize.json with the default page types
 ```
 
