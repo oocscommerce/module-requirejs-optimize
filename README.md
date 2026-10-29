@@ -66,6 +66,16 @@ bin/magento static:optimize:run [build|check|clean] [--theme Vendor/theme] [--lo
 bin/magento static:optimize:init [--force]   # write static-optimize.json with the default page types
 ```
 
+- `build` (default) writes the chunks and the loader, `check` only prints the analysis, `clean` removes
+  them.
+- `--theme`, `--locale`: only this theme/locale; by default every one used by an active store view.
+- `--min-chunk N`: chunks shared by several page types and smaller than N KB are merged into `common`.
+  Fewer requests, but every page then downloads that code, needed or not. `0` (default) never merges.
+- `--json report.json` (`check`): full analysis as JSON.
+- `--node`: Node.js binary when `node` is not in the `PATH`.
+- `--no-version-refresh`: keep the static content version (see above).
+- `-v`: engine details, and keeps the context file for debugging.
+
 ### Configuration: `static-optimize.json`
 
 Optional, in the Magento root; `bin/magento static:optimize:init` writes it with the defaults.
