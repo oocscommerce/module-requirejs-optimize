@@ -30,6 +30,7 @@ composer require oocscommerce/module-requirejs-optimize
 bin/magento module:enable OOCS_RequireJsOptimize
 bin/magento setup:upgrade && bin/magento setup:di:compile
 bin/magento setup:static-content:deploy
+bin/magento static:optimize:init       # write static-optimize.json (page types, exclude, entries) to edit
 bin/magento static:optimize:run        # build every theme/locale used by an active store view
 ```
 
