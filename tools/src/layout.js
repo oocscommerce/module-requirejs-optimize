@@ -461,8 +461,8 @@ class LayoutCollector {
             groups.always.templates.add(root);
         }
         // CMS pages/blocks and widget instances from the database
-        for (const add of state.cms || []) {
-            for (const b of add.blocks) {
+        for (const content of state.cms || []) {
+            for (const b of content.blocks) {
                 groups.always.classes.add(b.class);
                 for (const tpl of (b.template ? [b.template] : this.classTemplates(b.class))) {
                     const file = this.resolveTemplate(tpl, moduleOfClass(b.class));
@@ -471,7 +471,7 @@ class LayoutCollector {
                     }
                 }
             }
-            for (const html of add.html) {
+            for (const html of content.html) {
                 for (const id of this.jsStrings(html, false)) {
                     add(groups.always, id, 'cms content');
                 }

@@ -8,6 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const acorn = require('acorn');
 
 function isObject(v) {
     return v && typeof v === 'object' && !Array.isArray(v);
@@ -48,10 +49,32 @@ function loadRequireConfig(staticDir) {
     const src = fs.readFileSync(file, 'utf8').replace(/\/\* rjs-optimize:start \*\/[\s\S]*?\/\* rjs-optimize:end \*\/\n?/, '');
     const merged = {};
     const req = function () {};
-    req.config = (cfg) => mergeConfig(merged, cfg);
-    const sandbox = {require: req, requirejs: req, window: {}, document: {}, navigator: {userAgent: ''}, console};
-    sandbox.window.require = req;
-    vm.runInNewContext(src, sandbox, {filename: file});
+    let calls = [];
+    // applied once the block has run, so running it again does not repeat its config
+    req.config = (cfg) => calls.push(cfg);
+    const known = {require: req, requirejs: req, window: {}, document: {}, navigator: {userAgent: ''}, console};
+    known.window.require = req;
+    const context = vm.createContext(known);
+    // statement by statement, so one failing requirejs-config.js block does not drop the others
+    for (const node of acorn.parse(src, {ecmaVersion: 'latest', allowHashBang: true}).body) {
+        const code = src.slice(node.start, node.end);
+        for (let attempt = 0; attempt < 20; attempt++) {
+            calls = [];
+            try {
+                vm.runInContext(code, context, {filename: file});
+                break;
+            } catch (e) {
+                // a global the theme expects from the page (e.g. a flag printed in <head>): undefined, run again
+                const missing = e && e.name === 'ReferenceError' && /^(\S+) is not defined$/.exec(e.message);
+                if (!missing) {
+                    console.error(`warning: ${path.basename(file)}: skipped a block that fails outside the browser (${e.message})`);
+                    break;
+                }
+                context[missing[1]] = undefined;
+            }
+        }
+        calls.forEach((cfg) => mergeConfig(merged, cfg));
+    }
     return merged;
 }
 
