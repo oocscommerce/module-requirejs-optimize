@@ -206,9 +206,15 @@ function loaderSource(chunkFiles, moduleMap) {
             // JS minification is on, and urlArgs/baseUrl apply as usual
             s.node = load(context, '_rjso_' + i, context.nameToUrl(chunks[i]));
             if (s.node && s.node.addEventListener) {
+                // the fallback below handles a failed chunk: RequireJS would report a script error
+                // for "_rjso_N" (uncaught, or sent to a requirejs.onError such as Sentry)
+                s.node.removeEventListener('error', context.onScriptError, false);
                 s.node.addEventListener('error', function () {
                     // chunk missing: fall back to single files for everything that waited on it
                     s.failed = true;
+                    if (window.console) {
+                        console.warn('rjs-optimize: failed to load chunk ' + chunks[i] + ', falling back to individual module files');
+                    }
                     s.waiting.forEach(function (args) {
                         load.apply(require, args);
                     });
