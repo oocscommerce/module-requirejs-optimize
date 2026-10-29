@@ -20,6 +20,22 @@ Node engine in `tools/` parses JS and writes the chunks.
 - Falls back to single files when a chunk fails to load; rebuilds do not break pages being loaded
 - No `npm install` on the site: the engine ships as one file
 
+## Benchmark
+
+JS files loaded on Magento 2.4 Open Source, Luma with sample data, production mode, cold cache:
+
+| Page | Before | After |
+| --- | ---: | ---: |
+| Home | 194 | 12 |
+| Category | 195 | 11 |
+| Product | 220 | 19 |
+| Search | 200 | 15 |
+| Cart | 202 | 11 |
+| Checkout | 255 | 11 |
+
+Only these main pages were measured. Other pages (customer account, CMS pages, wishlist...) load fewer
+files too: the code every page shares comes from one `common` chunk.
+
 ## Installation
 
 Requirements: Magento 2.4, production mode, Node.js 18+ on the machine that runs `bin/magento`,
