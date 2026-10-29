@@ -100,12 +100,16 @@ class Engine
             null,
             null
         );
-        $process->start();
-        foreach ($process as $data) {
-            $write($data);
-        }
-        if (!$keep) {
-            $this->file->deleteFile($contextFile);
+        try {
+            $process->start();
+            foreach ($process as $data) {
+                $write($data);
+            }
+        } finally {
+            // holds CMS content and store config: removed even when the process fails to start or run
+            if (!$keep) {
+                $this->file->deleteFile($contextFile);
+            }
         }
         return [$process->isSuccessful(), $contextFile];
     }
