@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © OOCS Commerce (https://www.oocscommerce.com).
+ * See LICENSE.txt for license details.
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <type name="Magento\Framework\Console\CommandListInterface">
+        <arguments>
+            <argument name="commands" xsi:type="array">
+                <item name="static_optimize_init" xsi:type="object">OOCS\RequireJsOptimize\Console\Command\InitCommand</item>
+                <item name="static_optimize_run" xsi:type="object">OOCS\RequireJsOptimize\Console\Command\RunCommand</item>
+            </argument>
+        </arguments>
+    </type>
+    <type name="OOCS\RequireJsOptimize\Console\Command\RunCommand">
+        <arguments>
+            <argument name="contextBuilder" xsi:type="object">OOCS\RequireJsOptimize\Model\ContextBuilder\Proxy</argument>
+            <argument name="targetList" xsi:type="object">OOCS\RequireJsOptimize\Model\TargetList\Proxy</argument>
+        </arguments>
+    </type>
+</config>

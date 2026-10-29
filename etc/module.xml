@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © OOCS Commerce (https://www.oocscommerce.com).
+ * See LICENSE.txt for license details.
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Module/etc/module.xsd">
+    <module name="OOCS_RequireJsOptimize">
+        <sequence>
+            <module name="Magento_Store"/>
+            <module name="Magento_Theme"/>
+            <module name="Magento_Cms"/>
+            <module name="Magento_Widget"/>
+        </sequence>
+    </module>
+</config>

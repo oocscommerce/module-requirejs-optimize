@@ -1,0 +1,3 @@
+/.gitattributes export-ignore
+/tools/.gitignore export-ignore
+/tools/package-lock.json export-ignore

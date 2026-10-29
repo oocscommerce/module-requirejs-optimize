@@ -1,0 +1,30 @@
+{
+    "name": "oocscommerce/module-requirejs-optimize",
+    "description": "Browserless RequireJS bundling for Magento 2 storefronts",
+    "type": "magento2-module",
+    "version": "1.0.0",
+    "license": "MIT",
+    "keywords": [
+        "magento2",
+        "magento2-module",
+        "requirejs",
+        "bundling",
+        "performance"
+    ],
+    "require": {
+        "php": ">=8.1",
+        "magento/framework": "*",
+        "magento/module-cms": "*",
+        "magento/module-store": "*",
+        "magento/module-theme": "*",
+        "magento/module-widget": "*"
+    },
+    "autoload": {
+        "files": [
+            "registration.php"
+        ],
+        "psr-4": {
+            "OOCS\\RequireJsOptimize\\": ""
+        }
+    }
+}

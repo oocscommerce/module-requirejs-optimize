@@ -1,0 +1,230 @@
+<?php
+/**
+ * Copyright © OOCS Commerce (https://www.oocscommerce.com).
+ * See LICENSE.txt for license details.
+ */
+declare(strict_types=1);
+
+namespace OOCS\RequireJsOptimize\Model;
+
+use Magento\Framework\App\Filesystem\DirectoryList;
+use Magento\Framework\Exception\LocalizedException;
+use Magento\Framework\Filesystem\Driver\File;
+use Magento\Framework\Phrase;
+use Magento\Framework\Serialize\Serializer\Json;
+
+/**
+ * static-optimize.json in the Magento root, or the defaults.
+ */
+class PageConfig
+{
+    public const FILE = 'static-optimize.json';
+
+    public const DEFAULT_PAGES = [
+        'home' => ['default', 'cms_index_index', 'cms_page_view'],
+        'category' => ['default', 'catalog_category_view', 'catalog_category_view_type_layered'],
+        'product' => ['default', 'catalog_product_view', 'catalog_product_view_type_simple'],
+        'product-configurable' => ['default', 'catalog_product_view', 'catalog_product_view_type_configurable'],
+        'product-bundle' => ['default', 'catalog_product_view', 'catalog_product_view_type_bundle'],
+        'product-grouped' => ['default', 'catalog_product_view', 'catalog_product_view_type_grouped'],
+        'search' => ['default', 'catalogsearch_result_index'],
+        'cart' => ['default', 'checkout_cart_index'],
+        'checkout' => ['default', 'checkout_index_index'],
+        'success' => ['default', 'checkout_onepage_success'],
+        'login' => ['default', 'customer_account_login'],
+        'account' => ['default', 'customer_account_index'],
+    ];
+
+    /**
+     * Inject dependencies.
+     *
+     * @param DirectoryList $directoryList
+     * @param Json $json
+     * @param File $file
+     */
+    public function __construct(
+        private readonly DirectoryList $directoryList,
+        private readonly Json $json,
+        private readonly File $file
+    ) {
+    }
+
+    /**
+     * Absolute path of the config file.
+     *
+     * @return string
+     */
+    public function getPath(): string
+    {
+        return $this->directoryList->getRoot() . '/' . self::FILE;
+    }
+
+    /**
+     * Whether the site has its own config file.
+     *
+     * @return bool
+     */
+    public function exists(): bool
+    {
+        return $this->file->isFile($this->getPath());
+    }
+
+    /**
+     * Page types from the config file, or the defaults.
+     *
+     * @return array<string, string[]>
+     * @throws LocalizedException when the file is not valid
+     */
+    public function getPages(): array
+    {
+        $data = $this->getData();
+        if ($data === null) {
+            return self::DEFAULT_PAGES;
+        }
+        $pages = $data['pages'] ?? null;
+        if (!is_array($pages) || !$pages || array_is_list($pages)) {
+            throw $this->error('"pages" must be an object of page type => list of layout handles');
+        }
+        foreach ($pages as $name => $handles) {
+            $this->assertPageType((string)$name, $handles);
+        }
+        return $pages;
+    }
+
+    /**
+     * Module ids never bundled ("*" wildcard).
+     *
+     * @return string[]
+     * @throws LocalizedException when the file is not valid
+     */
+    public function getExclude(): array
+    {
+        $exclude = ($this->getData() ?? [])['exclude'] ?? [];
+        if (!is_array($exclude) || !array_is_list($exclude)) {
+            throw $this->error('"exclude" must be a list of module ids');
+        }
+        foreach ($exclude as $id) {
+            $this->assertModuleId($id, 'exclude');
+        }
+        return $exclude;
+    }
+
+    /**
+     * Extra entry modules per page type.
+     *
+     * @param array $pages page types in use (page type => layout handles)
+     * @return array<string, string[]>
+     * @throws LocalizedException when the file is not valid
+     */
+    public function getEntries(array $pages): array
+    {
+        $entries = ($this->getData() ?? [])['entries'] ?? [];
+        if (!is_array($entries) || ($entries && array_is_list($entries))) {
+            throw $this->error('"entries" must be an object of page type => list of module ids');
+        }
+        foreach ($entries as $page => $ids) {
+            if (!isset($pages[$page])) {
+                throw $this->error('"entries" refers to page type "%1" which is not in "pages"', [$page]);
+            }
+            if (!is_array($ids) || !array_is_list($ids)) {
+                throw $this->error('entries of "%1" must be a list of module ids', [$page]);
+            }
+            foreach ($ids as $id) {
+                $this->assertModuleId($id, 'entries.' . $page);
+            }
+        }
+        return $entries;
+    }
+
+    /**
+     * Validate a page type.
+     *
+     * @param string $name
+     * @param mixed $handles
+     * @return void
+     * @throws LocalizedException
+     */
+    private function assertPageType(string $name, mixed $handles): void
+    {
+        if (!preg_match('/^[a-z0-9][a-z0-9_-]*$/i', $name)) {
+            throw $this->error('invalid page type name "%1" (letters, digits, - and _)', [$name]);
+        }
+        if (!is_array($handles) || !$handles || !array_is_list($handles)) {
+            throw $this->error('page type "%1" needs a list of layout handles', [$name]);
+        }
+        foreach ($handles as $handle) {
+            if (!is_string($handle) || !preg_match('/^[a-z0-9_]+$/', $handle)) {
+                throw $this->error('page type "%1" has an invalid layout handle %2', [$name, json_encode($handle)]);
+            }
+        }
+    }
+
+    /**
+     * Config file error.
+     *
+     * @param string $message
+     * @param array $args values of %1, %2...
+     * @return LocalizedException
+     */
+    private function error(string $message, array $args = []): LocalizedException
+    {
+        return new LocalizedException(__('%1: %2', self::FILE, new Phrase($message, $args)));
+    }
+
+    /**
+     * Validate a module id or pattern.
+     *
+     * @param mixed $id
+     * @param string $key
+     * @return void
+     * @throws LocalizedException
+     */
+    private function assertModuleId(mixed $id, string $key): void
+    {
+        if (!is_string($id) || !preg_match('#^[A-Za-z0-9_\-.*!/]+$#', $id)) {
+            throw $this->error('invalid module id %1 in "%2"', [json_encode($id), $key]);
+        }
+    }
+
+    /**
+     * Decoded config file, null when there is none.
+     *
+     * @return array|null
+     * @throws LocalizedException when the file is not valid JSON
+     */
+    private function getData(): ?array
+    {
+        if (!$this->exists()) {
+            return null;
+        }
+        try {
+            $data = $this->json->unserialize($this->file->fileGetContents($this->getPath()));
+        } catch (\InvalidArgumentException $e) {
+            throw new LocalizedException(__('%1 is not valid JSON: %2', self::FILE, $e->getMessage()));
+        }
+        if (!is_array($data)) {
+            throw new LocalizedException(__('%1 must contain a JSON object', self::FILE));
+        }
+        return $data;
+    }
+
+    /**
+     * Writes the default config file.
+     *
+     * @param bool $overwrite
+     * @return string path written
+     * @throws LocalizedException when the file exists and $overwrite is false
+     */
+    public function writeDefault(bool $overwrite = false): string
+    {
+        if ($this->exists() && !$overwrite) {
+            throw new LocalizedException(__('%1 already exists, use --force to overwrite it', $this->getPath()));
+        }
+        $content = json_encode(
+            ['exclude' => [], 'entries' => (object)[], 'pages' => self::DEFAULT_PAGES],
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
+        ) . "\n";
+        $this->file->filePutContents($this->getPath(), $content);
+        return $this->getPath();
+    }
+}
