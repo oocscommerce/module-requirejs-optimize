@@ -190,8 +190,7 @@ function mergeSmallChunks(chunks, minSize) {
 }
 
 function loaderSource(chunkFiles, moduleMap) {
-    return `${MARK_START}
-(function (require) {
+    return `(function (require) {
     'use strict';
     var chunks = ${JSON.stringify(chunkFiles)},
         map = ${JSON.stringify(moduleMap)},
@@ -243,8 +242,12 @@ function loaderSource(chunkFiles, moduleMap) {
         });
     };
 })(require);
-${MARK_END}
 `;
+}
+
+/** Loader between the markers that stripLoader() looks for. */
+function wrapLoader(code) {
+    return MARK_START + '\n' + code.trim() + '\n' + MARK_END + '\n';
 }
 
 /**
@@ -428,7 +431,9 @@ async function build(opts) {
     for (const f of configFiles) {
         const file = path.join(staticDir, f);
         if (fs.existsSync(file)) {
-            fs.writeFileSync(file, loader + stripLoader(fs.readFileSync(file, 'utf8')));
+            // minified like the rest of requirejs-config.min.js
+            const code = f.endsWith('.min.js') ? await minify(loader, f, warnings) : loader;
+            fs.writeFileSync(file, wrapLoader(code) + stripLoader(fs.readFileSync(file, 'utf8')));
         }
     }
     const keep = new Set(results.map((c) => c.file).concat(previousFiles));
