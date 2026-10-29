@@ -7,9 +7,12 @@ declare(strict_types=1);
 
 namespace OOCS\RequireJsOptimize\Model;
 
+use Magento\Cms\Api\Data\BlockInterface;
+use Magento\Cms\Api\Data\PageInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\DB\Adapter\AdapterInterface;
+use Magento\Framework\EntityManager\MetadataPool;
 use Magento\Store\Model\ScopeInterface;
 
 /**
@@ -25,10 +28,12 @@ class CmsContent
      *
      * @param ResourceConnection $resource
      * @param ScopeConfigInterface $scopeConfig
+     * @param MetadataPool $metadataPool
      */
     public function __construct(
         private readonly ResourceConnection $resource,
-        private readonly ScopeConfigInterface $scopeConfig
+        private readonly ScopeConfigInterface $scopeConfig,
+        private readonly MetadataPool $metadataPool
     ) {
     }
 
@@ -62,9 +67,11 @@ class CmsContent
      */
     private function getBlocks(AdapterInterface $connection, array $stores): array
     {
+        // row_id on Adobe Commerce (content staging), block_id on Open Source
+        $link = $this->metadataPool->getMetadata(BlockInterface::class)->getLinkField();
         $select = $connection->select()
             ->from(['b' => $this->resource->getTableName('cms_block')], ['block_id', 'identifier', 'content'])
-            ->join(['s' => $this->resource->getTableName('cms_block_store')], 's.block_id = b.block_id', [])
+            ->join(['s' => $this->resource->getTableName('cms_block_store')], "s.$link = b.$link", [])
             ->where('b.is_active = 1')
             ->where('s.store_id IN (?)', $stores);
         $blocks = [];
@@ -94,9 +101,10 @@ class CmsContent
     ): int {
         $home = $this->getPageIdentifier('web/default/cms_home_page', $storeId);
         $noRoute = $this->getPageIdentifier('web/default/cms_no_route', $storeId);
+        $link = $this->metadataPool->getMetadata(PageInterface::class)->getLinkField();
         $select = $connection->select()
             ->from(['p' => $this->resource->getTableName('cms_page')], ['identifier', 'content'])
-            ->join(['s' => $this->resource->getTableName('cms_page_store')], 's.page_id = p.page_id', [])
+            ->join(['s' => $this->resource->getTableName('cms_page_store')], "s.$link = p.$link", [])
             ->where('p.is_active = 1')
             ->where('s.store_id IN (?)', $stores)
             ->group('p.page_id');
