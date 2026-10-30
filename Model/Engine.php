@@ -20,8 +20,23 @@ use Symfony\Component\Process\Process;
 class Engine
 {
     public const MIN_NODE_MAJOR = 18;
-    private const SCRIPT = 'rjs-optimize.js';
-    private const TMP_DIR = 'oocs_requirejsoptimize';
+    protected const SCRIPT = 'rjs-optimize.js';
+    protected const TMP_DIR = 'oocs_requirejsoptimize';
+
+    /**
+     * @var DirectoryList
+     */
+    protected $directoryList;
+
+    /**
+     * @var File
+     */
+    protected $file;
+
+    /**
+     * @var ComponentRegistrarInterface
+     */
+    protected $componentRegistrar;
 
     /**
      * Inject dependencies.
@@ -31,10 +46,13 @@ class Engine
      * @param ComponentRegistrarInterface $componentRegistrar
      */
     public function __construct(
-        private readonly DirectoryList $directoryList,
-        private readonly File $file,
-        private readonly ComponentRegistrarInterface $componentRegistrar
+        DirectoryList $directoryList,
+        File $file,
+        ComponentRegistrarInterface $componentRegistrar
     ) {
+        $this->directoryList = $directoryList;
+        $this->file = $file;
+        $this->componentRegistrar = $componentRegistrar;
     }
 
     /**
@@ -119,7 +137,7 @@ class Engine
      *
      * @return string
      */
-    private function getDir(): string
+    protected function getDir(): string
     {
         return $this->componentRegistrar->getPath(ComponentRegistrar::MODULE, 'OOCS_RequireJsOptimize') . '/tools';
     }
@@ -129,7 +147,7 @@ class Engine
      *
      * @return string
      */
-    private function getScript(): string
+    protected function getScript(): string
     {
         $dist = $this->getDir() . '/dist/' . self::SCRIPT;
         return $this->file->isFile($dist) ? $dist : $this->getDir() . '/bin/' . self::SCRIPT;

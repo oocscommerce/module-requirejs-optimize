@@ -36,6 +36,21 @@ class PageConfig
     ];
 
     /**
+     * @var DirectoryList
+     */
+    protected $directoryList;
+
+    /**
+     * @var Json
+     */
+    protected $json;
+
+    /**
+     * @var File
+     */
+    protected $file;
+
+    /**
      * Inject dependencies.
      *
      * @param DirectoryList $directoryList
@@ -43,10 +58,13 @@ class PageConfig
      * @param File $file
      */
     public function __construct(
-        private readonly DirectoryList $directoryList,
-        private readonly Json $json,
-        private readonly File $file
+        DirectoryList $directoryList,
+        Json $json,
+        File $file
     ) {
+        $this->directoryList = $directoryList;
+        $this->json = $json;
+        $this->file = $file;
     }
 
     /**
@@ -82,7 +100,7 @@ class PageConfig
             return self::DEFAULT_PAGES;
         }
         $pages = $data['pages'] ?? null;
-        if (!is_array($pages) || !$pages || array_is_list($pages)) {
+        if (!is_array($pages) || !$pages || $this->isList($pages)) {
             throw $this->error('"pages" must be an object of page type => list of layout handles');
         }
         foreach ($pages as $name => $handles) {
@@ -100,7 +118,7 @@ class PageConfig
     public function getExclude(): array
     {
         $exclude = ($this->getData() ?? [])['exclude'] ?? [];
-        if (!is_array($exclude) || !array_is_list($exclude)) {
+        if (!is_array($exclude) || !$this->isList($exclude)) {
             throw $this->error('"exclude" must be a list of module ids');
         }
         foreach ($exclude as $id) {
@@ -119,14 +137,14 @@ class PageConfig
     public function getEntries(array $pages): array
     {
         $entries = ($this->getData() ?? [])['entries'] ?? [];
-        if (!is_array($entries) || ($entries && array_is_list($entries))) {
+        if (!is_array($entries) || ($entries && $this->isList($entries))) {
             throw $this->error('"entries" must be an object of page type => list of module ids');
         }
         foreach ($entries as $page => $ids) {
             if (!isset($pages[$page])) {
                 throw $this->error('"entries" refers to page type "%1" which is not in "pages"', [$page]);
             }
-            if (!is_array($ids) || !array_is_list($ids)) {
+            if (!is_array($ids) || !$this->isList($ids)) {
                 throw $this->error('entries of "%1" must be a list of module ids', [$page]);
             }
             foreach ($ids as $id) {
@@ -144,12 +162,12 @@ class PageConfig
      * @return void
      * @throws LocalizedException
      */
-    private function assertPageType(string $name, mixed $handles): void
+    protected function assertPageType(string $name, $handles): void
     {
         if (!preg_match('/^[a-z0-9][a-z0-9_-]*$/i', $name)) {
             throw $this->error('invalid page type name "%1" (letters, digits, - and _)', [$name]);
         }
-        if (!is_array($handles) || !$handles || !array_is_list($handles)) {
+        if (!is_array($handles) || !$handles || !$this->isList($handles)) {
             throw $this->error('page type "%1" needs a list of layout handles', [$name]);
         }
         foreach ($handles as $handle) {
@@ -166,7 +184,7 @@ class PageConfig
      * @param array $args values of %1, %2...
      * @return LocalizedException
      */
-    private function error(string $message, array $args = []): LocalizedException
+    protected function error(string $message, array $args = []): LocalizedException
     {
         return new LocalizedException(__('%1: %2', self::FILE, new Phrase($message, $args)));
     }
@@ -179,7 +197,7 @@ class PageConfig
      * @return void
      * @throws LocalizedException
      */
-    private function assertModuleId(mixed $id, string $key): void
+    protected function assertModuleId($id, string $key): void
     {
         if (!is_string($id) || !preg_match('#^[A-Za-z0-9_\-.*!/]+$#', $id)) {
             throw $this->error('invalid module id %1 in "%2"', [json_encode($id), $key]);
@@ -192,7 +210,7 @@ class PageConfig
      * @return array|null
      * @throws LocalizedException when the file is not valid JSON
      */
-    private function getData(): ?array
+    protected function getData(): ?array
     {
         if (!$this->exists()) {
             return null;
@@ -226,5 +244,16 @@ class PageConfig
         ) . "\n";
         $this->file->filePutContents($this->getPath(), $content);
         return $this->getPath();
+    }
+
+    /**
+     * Whether an array is a list (keys 0..n-1), like array_is_list() of PHP 8.1.
+     *
+     * @param array $array
+     * @return bool
+     */
+    protected function isList(array $array): bool
+    {
+        return $array === [] || array_keys($array) === range(0, count($array) - 1);
     }
 }

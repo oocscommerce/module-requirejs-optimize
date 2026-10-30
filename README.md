@@ -38,7 +38,7 @@ files too: the code every page shares comes from one `common` chunk.
 
 ## Installation
 
-Requirements: Magento 2.4, production mode, Node.js 18+ on the machine that runs `bin/magento`,
+Requirements: production mode, Node.js 18+ on the machine that runs `bin/magento`,
 `dev/js/enable_js_bundling` off.
 
 ```bash

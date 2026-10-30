@@ -20,8 +20,23 @@ use Magento\Store\Model\ScopeInterface;
  */
 class CmsContent
 {
-    private const CMS_BLOCK_CLASS = '/Cms\\\\Block\\\\(Widget\\\\)?Block$/';
-    private const CMS_BLOCK_WIDGET = '/Cms\\\\Block\\\\Widget\\\\Block$/';
+    protected const CMS_BLOCK_CLASS = '/Cms\\\\Block\\\\(Widget\\\\)?Block$/';
+    protected const CMS_BLOCK_WIDGET = '/Cms\\\\Block\\\\Widget\\\\Block$/';
+
+    /**
+     * @var ResourceConnection
+     */
+    protected $resource;
+
+    /**
+     * @var ScopeConfigInterface
+     */
+    protected $scopeConfig;
+
+    /**
+     * @var MetadataPool
+     */
+    protected $metadataPool;
 
     /**
      * Inject dependencies.
@@ -31,10 +46,13 @@ class CmsContent
      * @param MetadataPool $metadataPool
      */
     public function __construct(
-        private readonly ResourceConnection $resource,
-        private readonly ScopeConfigInterface $scopeConfig,
-        private readonly MetadataPool $metadataPool
+        ResourceConnection $resource,
+        ScopeConfigInterface $scopeConfig,
+        MetadataPool $metadataPool
     ) {
+        $this->resource = $resource;
+        $this->scopeConfig = $scopeConfig;
+        $this->metadataPool = $metadataPool;
     }
 
     /**
@@ -65,7 +83,7 @@ class CmsContent
      * @param int[] $stores
      * @return array<string, string>
      */
-    private function getBlocks(AdapterInterface $connection, array $stores): array
+    protected function getBlocks(AdapterInterface $connection, array $stores): array
     {
         // row_id on Adobe Commerce (content staging), block_id on Open Source
         $link = $this->metadataPool->getMetadata(BlockInterface::class)->getLinkField();
@@ -92,7 +110,7 @@ class CmsContent
      * @param int $storeId store view whose home / 404 page settings apply
      * @return int number of pages
      */
-    private function addPages(
+    protected function addPages(
         array &$byHandle,
         AdapterInterface $connection,
         array $blocks,
@@ -110,11 +128,12 @@ class CmsContent
             ->group('p.page_id');
         $pages = $connection->fetchAll($select);
         foreach ($pages as $page) {
-            $handle = match ($page['identifier']) {
-                $home => 'cms_index_index',
-                $noRoute => 'cms_noroute_index',
-                default => 'cms_page_view',
-            };
+            $handle = 'cms_page_view';
+            if ($page['identifier'] === $home) {
+                $handle = 'cms_index_index';
+            } elseif ($page['identifier'] === $noRoute) {
+                $handle = 'cms_noroute_index';
+            }
             $this->addContent($byHandle, $handle, (string)$page['content'], $blocks);
         }
         return count($pages);
@@ -130,7 +149,7 @@ class CmsContent
      * @param int $themeId
      * @return int number of widget instances
      */
-    private function addWidgets(
+    protected function addWidgets(
         array &$byHandle,
         AdapterInterface $connection,
         array $blocks,
@@ -176,14 +195,16 @@ class CmsContent
      * @param array $seen CMS blocks already expanded (recursion guard)
      * @return void
      */
-    private function addContent(
+    protected function addContent(
         array &$byHandle,
         string $handle,
         string $content,
         array $blocks,
         array $seen = []
     ): void {
-        $byHandle[$handle] ??= ['blocks' => [], 'html' => []];
+        if (!isset($byHandle[$handle])) {
+            $byHandle[$handle] = ['blocks' => [], 'html' => []];
+        }
         $byHandle[$handle]['html'][] = $content;
         foreach ($this->parseDirectives($content) as $params) {
             $class = $params['type'] ?? $params['class'] ?? null;
@@ -205,9 +226,11 @@ class CmsContent
      * @param string|null $template
      * @return void
      */
-    private function addBlock(array &$byHandle, string $handle, string $class, ?string $template): void
+    protected function addBlock(array &$byHandle, string $handle, string $class, ?string $template): void
     {
-        $byHandle[$handle] ??= ['blocks' => [], 'html' => []];
+        if (!isset($byHandle[$handle])) {
+            $byHandle[$handle] = ['blocks' => [], 'html' => []];
+        }
         $byHandle[$handle]['blocks'][] = ['class' => $class, 'template' => $template];
     }
 
@@ -218,7 +241,7 @@ class CmsContent
      * @param int $storeId
      * @return string
      */
-    private function getPageIdentifier(string $path, int $storeId): string
+    protected function getPageIdentifier(string $path, int $storeId): string
     {
         return (string)strtok((string)$this->scopeConfig->getValue($path, ScopeInterface::SCOPE_STORE, $storeId), '|');
     }
@@ -229,7 +252,7 @@ class CmsContent
      * @param string $content
      * @return array<int, array<string, string>>
      */
-    private function parseDirectives(string $content): array
+    protected function parseDirectives(string $content): array
     {
         $out = [];
         preg_match_all('/\{\{(?:widget|block)\s+([^}]*)\}\}/', $content, $directives);

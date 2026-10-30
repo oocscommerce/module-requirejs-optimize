@@ -18,6 +18,21 @@ use Magento\Framework\App\View\Deployment\Version\StorageInterface;
 class StaticVersion
 {
     /**
+     * @var DeployStaticContent
+     */
+    protected $deployStaticContent;
+
+    /**
+     * @var StorageInterface
+     */
+    protected $storage;
+
+    /**
+     * @var ScopeConfigInterface
+     */
+    protected $scopeConfig;
+
+    /**
      * Inject dependencies.
      *
      * @param DeployStaticContent $deployStaticContent
@@ -25,10 +40,13 @@ class StaticVersion
      * @param ScopeConfigInterface $scopeConfig
      */
     public function __construct(
-        private readonly DeployStaticContent $deployStaticContent,
-        private readonly StorageInterface $storage,
-        private readonly ScopeConfigInterface $scopeConfig
+        DeployStaticContent $deployStaticContent,
+        StorageInterface $storage,
+        ScopeConfigInterface $scopeConfig
     ) {
+        $this->deployStaticContent = $deployStaticContent;
+        $this->storage = $storage;
+        $this->scopeConfig = $scopeConfig;
     }
 
     /**

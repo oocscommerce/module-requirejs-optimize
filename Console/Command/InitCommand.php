@@ -19,6 +19,14 @@ use Symfony\Component\Console\Output\OutputInterface;
  */
 class InitCommand extends Command
 {
+    protected const EXIT_SUCCESS = 0;
+    protected const EXIT_FAILURE = 1;
+
+    /**
+     * @var PageConfig
+     */
+    protected $pageConfig;
+
     /**
      * Inject dependencies.
      *
@@ -26,9 +34,10 @@ class InitCommand extends Command
      * @param string|null $name
      */
     public function __construct(
-        private readonly PageConfig $pageConfig,
+        PageConfig $pageConfig,
         ?string $name = null
     ) {
+        $this->pageConfig = $pageConfig;
         parent::__construct($name);
     }
 
@@ -58,11 +67,11 @@ class InitCommand extends Command
             $path = $this->pageConfig->writeDefault((bool)$input->getOption('force'));
         } catch (LocalizedException $e) {
             $output->writeln('<error>' . $e->getMessage() . '</error>');
-            return Command::FAILURE;
+            return self::EXIT_FAILURE;
         }
         $output->writeln("<info>Wrote {$path}</info>");
         $output->writeln('Add or remove page types there: "name": [layout handles of that page],'
             . ' then run bin/magento static:optimize:run');
-        return Command::SUCCESS;
+        return self::EXIT_SUCCESS;
     }
 }

@@ -24,6 +24,46 @@ use Magento\Store\Model\ScopeInterface;
 class ContextBuilder
 {
     /**
+     * @var TargetList
+     */
+    protected $targetList;
+
+    /**
+     * @var ScopeConfigInterface
+     */
+    protected $scopeConfig;
+
+    /**
+     * @var ModuleListInterface
+     */
+    protected $moduleList;
+
+    /**
+     * @var ComponentRegistrarInterface
+     */
+    protected $componentRegistrar;
+
+    /**
+     * @var LayoutFileCollector
+     */
+    protected $layoutFileCollector;
+
+    /**
+     * @var CmsContent
+     */
+    protected $cmsContent;
+
+    /**
+     * @var DirectoryList
+     */
+    protected $directoryList;
+
+    /**
+     * @var File
+     */
+    protected $file;
+
+    /**
      * Inject dependencies.
      *
      * @param TargetList $targetList
@@ -36,15 +76,23 @@ class ContextBuilder
      * @param File $file
      */
     public function __construct(
-        private readonly TargetList $targetList,
-        private readonly ScopeConfigInterface $scopeConfig,
-        private readonly ModuleListInterface $moduleList,
-        private readonly ComponentRegistrarInterface $componentRegistrar,
-        private readonly LayoutFileCollector $layoutFileCollector,
-        private readonly CmsContent $cmsContent,
-        private readonly DirectoryList $directoryList,
-        private readonly File $file
+        TargetList $targetList,
+        ScopeConfigInterface $scopeConfig,
+        ModuleListInterface $moduleList,
+        ComponentRegistrarInterface $componentRegistrar,
+        LayoutFileCollector $layoutFileCollector,
+        CmsContent $cmsContent,
+        DirectoryList $directoryList,
+        File $file
     ) {
+        $this->targetList = $targetList;
+        $this->scopeConfig = $scopeConfig;
+        $this->moduleList = $moduleList;
+        $this->componentRegistrar = $componentRegistrar;
+        $this->layoutFileCollector = $layoutFileCollector;
+        $this->cmsContent = $cmsContent;
+        $this->directoryList = $directoryList;
+        $this->file = $file;
     }
 
     /**
@@ -107,7 +155,7 @@ class ContextBuilder
      * @param int[] $storeIds
      * @return array<string, bool|null>
      */
-    private function getIfconfigValues(array $layoutFiles, array $storeIds): array
+    protected function getIfconfigValues(array $layoutFiles, array $storeIds): array
     {
         $paths = [];
         foreach ($layoutFiles as $files) {
@@ -119,7 +167,9 @@ class ContextBuilder
         }
         $values = [];
         foreach (array_keys($paths) as $path) {
-            $flags = array_unique(array_map(fn ($storeId) => $this->isSetFlag($path, $storeId), $storeIds));
+            $flags = array_unique(array_map(function ($storeId) use ($path) {
+                return $this->isSetFlag($path, $storeId);
+            }, $storeIds));
             $values[$path] = count($flags) === 1 ? reset($flags) : null;
         }
         return $values;
@@ -132,7 +182,7 @@ class ContextBuilder
      * @param int $storeId
      * @return bool
      */
-    private function isSetFlag(string $path, int $storeId): bool
+    protected function isSetFlag(string $path, int $storeId): bool
     {
         return $this->scopeConfig->isSetFlag($path, ScopeInterface::SCOPE_STORE, $storeId);
     }
@@ -142,17 +192,38 @@ class ContextBuilder
      *
      * @return array<int, array{0: string, 1: string}>
      */
-    private function getPsr4(): array
+    protected function getPsr4(): array
     {
         $out = [];
-        foreach (ClassLoader::getRegisteredLoaders() as $loader) {
+        foreach ($this->getClassLoaders() as $loader) {
             foreach ($loader->getPrefixesPsr4() as $prefix => $dirs) {
                 foreach ($dirs as $dir) {
                     $out[] = [$prefix, $this->file->getRealPath($dir) ?: $dir];
                 }
             }
         }
-        usort($out, static fn ($a, $b) => strlen($b[0]) <=> strlen($a[0]));
+        usort($out, static function ($a, $b) {
+            return strlen($b[0]) <=> strlen($a[0]);
+        });
         return $out;
+    }
+
+    /**
+     * Composer class loaders (getRegisteredLoaders() exists from Composer 2 only).
+     *
+     * @return ClassLoader[]
+     */
+    protected function getClassLoaders(): array
+    {
+        if (method_exists(ClassLoader::class, 'getRegisteredLoaders')) {
+            return ClassLoader::getRegisteredLoaders();
+        }
+        $loaders = [];
+        foreach (spl_autoload_functions() ?: [] as $function) {
+            if (is_array($function) && $function[0] instanceof ClassLoader) {
+                $loaders[] = $function[0];
+            }
+        }
+        return $loaders;
     }
 }

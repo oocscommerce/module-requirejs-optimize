@@ -9,6 +9,8 @@ namespace OOCS\RequireJsOptimize\Model;
 
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\Filesystem\DirectoryList;
+use Magento\Framework\App\State;
+use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Filesystem\Driver\File;
 use Magento\Framework\View\Design\Theme\ThemeProviderInterface;
 use Magento\Framework\View\Design\ThemeInterface;
@@ -22,7 +24,42 @@ use Magento\Store\Model\StoreManagerInterface;
  */
 class TargetList
 {
-    private const AREA = 'frontend';
+    protected const AREA = 'frontend';
+
+    /**
+     * @var StoreManagerInterface
+     */
+    protected $storeManager;
+
+    /**
+     * @var ScopeConfigInterface
+     */
+    protected $scopeConfig;
+
+    /**
+     * @var DesignInterface
+     */
+    protected $design;
+
+    /**
+     * @var ThemeProviderInterface
+     */
+    protected $themeProvider;
+
+    /**
+     * @var DirectoryList
+     */
+    protected $directoryList;
+
+    /**
+     * @var File
+     */
+    protected $file;
+
+    /**
+     * @var State
+     */
+    protected $appState;
 
     /**
      * Inject dependencies.
@@ -33,15 +70,24 @@ class TargetList
      * @param ThemeProviderInterface $themeProvider
      * @param DirectoryList $directoryList
      * @param File $file
+     * @param State $appState
      */
     public function __construct(
-        private readonly StoreManagerInterface $storeManager,
-        private readonly ScopeConfigInterface $scopeConfig,
-        private readonly DesignInterface $design,
-        private readonly ThemeProviderInterface $themeProvider,
-        private readonly DirectoryList $directoryList,
-        private readonly File $file
+        StoreManagerInterface $storeManager,
+        ScopeConfigInterface $scopeConfig,
+        DesignInterface $design,
+        ThemeProviderInterface $themeProvider,
+        DirectoryList $directoryList,
+        File $file,
+        State $appState
     ) {
+        $this->storeManager = $storeManager;
+        $this->scopeConfig = $scopeConfig;
+        $this->design = $design;
+        $this->themeProvider = $themeProvider;
+        $this->directoryList = $directoryList;
+        $this->file = $file;
+        $this->appState = $appState;
     }
 
     /**
@@ -50,9 +96,11 @@ class TargetList
      * @param string|null $themeFilter Vendor/theme
      * @param string|null $localeFilter xx_XX
      * @return array<int, array>
+     * @throws LocalizedException
      */
     public function get(?string $themeFilter = null, ?string $localeFilter = null): array
     {
+        $this->setArea();
         $targets = [];
         foreach ($this->storeManager->getStores() as $store) {
             $theme = $store->isActive() ? $this->getStoreTheme($store) : null;
@@ -70,7 +118,9 @@ class TargetList
                 continue;
             }
             $key = $theme->getThemePath() . '/' . $locale;
-            $targets[$key] ??= $this->createTarget($theme, $locale);
+            if (!isset($targets[$key])) {
+                $targets[$key] = $this->createTarget($theme, $locale);
+            }
             $targets[$key]['storeIds'][] = (int)$store->getId();
         }
         return array_values($targets);
@@ -82,7 +132,7 @@ class TargetList
      * @param StoreInterface $store
      * @return ThemeInterface|null
      */
-    private function getStoreTheme(StoreInterface $store): ?ThemeInterface
+    protected function getStoreTheme(StoreInterface $store): ?ThemeInterface
     {
         $themeId = $this->design->getConfigurationDesignTheme(self::AREA, ['store' => $store]);
         $theme = is_numeric($themeId)
@@ -98,7 +148,7 @@ class TargetList
      * @param string $locale
      * @return array
      */
-    private function createTarget(ThemeInterface $theme, string $locale): array
+    protected function createTarget(ThemeInterface $theme, string $locale): array
     {
         $dir = $this->getStaticDir($theme, $locale);
         return [
@@ -122,5 +172,20 @@ class TargetList
     {
         return $this->directoryList->getPath(DirectoryList::STATIC_VIEW)
             . '/' . self::AREA . '/' . $theme->getThemePath() . '/' . $locale;
+    }
+
+    /**
+     * Frontend area, so the theme APIs resolve storefront themes.
+     *
+     * @return void
+     * @throws LocalizedException
+     */
+    protected function setArea(): void
+    {
+        try {
+            $this->appState->getAreaCode();
+        } catch (LocalizedException $e) {
+            $this->appState->setAreaCode(self::AREA);
+        }
     }
 }

@@ -7,8 +7,6 @@ declare(strict_types=1);
 
 namespace OOCS\RequireJsOptimize\Console\Command;
 
-use Magento\Framework\App\Area;
-use Magento\Framework\App\State;
 use Magento\Framework\Exception\LocalizedException;
 use OOCS\RequireJsOptimize\Model\ContextBuilder;
 use OOCS\RequireJsOptimize\Model\Engine;
@@ -26,7 +24,34 @@ use Symfony\Component\Console\Output\OutputInterface;
  */
 class RunCommand extends Command
 {
-    private const ACTIONS = ['build', 'check', 'clean'];
+    protected const EXIT_SUCCESS = 0;
+    protected const EXIT_FAILURE = 1;
+    protected const ACTIONS = ['build', 'check', 'clean'];
+
+    /**
+     * @var TargetList
+     */
+    protected $targetList;
+
+    /**
+     * @var ContextBuilder
+     */
+    protected $contextBuilder;
+
+    /**
+     * @var PageConfig
+     */
+    protected $pageConfig;
+
+    /**
+     * @var Engine
+     */
+    protected $engine;
+
+    /**
+     * @var StaticVersion
+     */
+    protected $staticVersion;
 
     /**
      * Inject dependencies.
@@ -34,20 +59,23 @@ class RunCommand extends Command
      * @param TargetList $targetList
      * @param ContextBuilder $contextBuilder
      * @param PageConfig $pageConfig
-     * @param State $appState
      * @param Engine $engine
      * @param StaticVersion $staticVersion
      * @param string|null $name
      */
     public function __construct(
-        private readonly TargetList $targetList,
-        private readonly ContextBuilder $contextBuilder,
-        private readonly PageConfig $pageConfig,
-        private readonly State $appState,
-        private readonly Engine $engine,
-        private readonly StaticVersion $staticVersion,
+        TargetList $targetList,
+        ContextBuilder $contextBuilder,
+        PageConfig $pageConfig,
+        Engine $engine,
+        StaticVersion $staticVersion,
         ?string $name = null
     ) {
+        $this->targetList = $targetList;
+        $this->contextBuilder = $contextBuilder;
+        $this->pageConfig = $pageConfig;
+        $this->engine = $engine;
+        $this->staticVersion = $staticVersion;
         parent::__construct($name);
     }
 
@@ -97,34 +125,35 @@ class RunCommand extends Command
             $output->writeln(
                 sprintf('<error>Unknown action "%s", use %s</error>', $action, implode(' | ', self::ACTIONS))
             );
-            return Command::INVALID;
+            return self::EXIT_FAILURE;
         }
         try {
             $config = $this->getConfig();
             $node = (string)$input->getOption('node');
             $this->engine->check($node);
-            $this->setArea();
             $targets = $this->targetList->get($input->getOption('theme'), $input->getOption('locale'));
             if (!$targets) {
                 throw new LocalizedException(__('No active store view uses a matching frontend theme/locale.'));
             }
         } catch (LocalizedException $e) {
             $output->writeln('<error>' . $e->getMessage() . '</error>');
-            return Command::FAILURE;
+            return self::EXIT_FAILURE;
         }
         $output->writeln('<comment>page types from ' . ($this->pageConfig->exists()
             ? $this->pageConfig->getPath()
             : 'defaults (bin/magento static:optimize:init to customize)') . '</comment>');
 
         $results = array_map(
-            fn (array $target) => $this->runTarget($target, $config, $node, $action, $input, $output),
+            function (array $target) use ($config, $node, $action, $input, $output) {
+                return $this->runTarget($target, $config, $node, $action, $input, $output);
+            },
             $targets
         );
         // only when static files changed: a new version empties browser and CDN caches of all static files
         if ($action !== 'check' && in_array(true, $results, true) && !$input->getOption('no-version-refresh')) {
             $this->refreshStaticVersion($output);
         }
-        return in_array(false, $results, true) ? Command::FAILURE : Command::SUCCESS;
+        return in_array(false, $results, true) ? self::EXIT_FAILURE : self::EXIT_SUCCESS;
     }
 
     /**
@@ -133,7 +162,7 @@ class RunCommand extends Command
      * @return array
      * @throws LocalizedException
      */
-    private function getConfig(): array
+    protected function getConfig(): array
     {
         $pages = $this->pageConfig->getPages();
         return [
@@ -149,7 +178,7 @@ class RunCommand extends Command
      * @param OutputInterface $output
      * @return void
      */
-    private function refreshStaticVersion(OutputInterface $output): void
+    protected function refreshStaticVersion(OutputInterface $output): void
     {
         if (!$this->staticVersion->isSigned()) {
             $output->writeln('<comment>dev/static/sign is off: browsers and CDNs may keep the old'
@@ -159,21 +188,6 @@ class RunCommand extends Command
         $version = $this->staticVersion->refresh();
         $output->writeln("<comment>Static content version is now {$version}:"
             . ' flush the full page cache and purge Varnish/CDN.</comment>');
-    }
-
-    /**
-     * Set frontend area.
-     *
-     * @return void
-     * @throws LocalizedException
-     */
-    private function setArea(): void
-    {
-        try {
-            $this->appState->getAreaCode();
-        } catch (LocalizedException $e) {
-            $this->appState->setAreaCode(Area::AREA_FRONTEND);
-        }
     }
 
     /**
@@ -188,7 +202,7 @@ class RunCommand extends Command
      * @return bool|null false when the engine failed, null when skipped
      * @throws LocalizedException
      */
-    private function runTarget(
+    protected function runTarget(
         array $target,
         array $config,
         string $node,
@@ -209,7 +223,9 @@ class RunCommand extends Command
             str_replace('/', '_', $themePath) . '-' . $target['locale'],
             $config + $this->contextBuilder->build($target),
             $this->getEngineArgs($action, $input, $output),
-            static fn (string $data) => $output->write($data),
+            static function (string $data) use ($output) {
+                $output->write($data);
+            },
             $output->isVerbose()
         );
         // kept with -v for debugging
@@ -227,7 +243,7 @@ class RunCommand extends Command
      * @param OutputInterface $output
      * @return string[]
      */
-    private function getEngineArgs(string $action, InputInterface $input, OutputInterface $output): array
+    protected function getEngineArgs(string $action, InputInterface $input, OutputInterface $output): array
     {
         $args = [];
         if ($action === 'build') {
