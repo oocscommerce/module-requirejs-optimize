@@ -279,26 +279,6 @@ async function minify(code, name, warnings) {
     }
 }
 
-/**
- * With dev/js/merge_files on, pages load pub/static/_cache/merged/<hash>.js built from
- * require.js + mixins.js + requirejs-config.js. Merged files made before the loader was
- * installed would not contain it, so they are removed; Magento rebuilds them (and their
- * SRI hashes) on the next request.
- */
-function clearMergedJs(root) {
-    const dir = path.join(root, 'pub/static/_cache/merged');
-    let removed = 0;
-    if (fs.existsSync(dir)) {
-        for (const f of fs.readdirSync(dir)) {
-            if (f.endsWith('.js')) {
-                fs.rmSync(path.join(dir, f), {force: true});
-                removed++;
-            }
-        }
-    }
-    return removed;
-}
-
 async function build(opts) {
     const r = await analyze(opts);
     // Magento's own JS bundling replaces RequireJS loading and cannot be combined with rjs-optimize
@@ -421,10 +401,6 @@ async function build(opts) {
             fs.rmSync(path.join(outDir, f), {force: true});
         }
     }
-    const merged = clearMergedJs(project.root);
-    if (merged) {
-        warnings.push(`removed ${merged} merged JS file(s) from pub/static/_cache/merged (rebuilt by Magento with the loader)`);
-    }
     for (const [page, handles] of Object.entries(r.skippedPages)) {
         warnings.push(`page type "${page}" skipped: no layout for ${handles.join(', ')} on this site`);
     }
@@ -450,7 +426,6 @@ function clean(opts) {
             fs.writeFileSync(file, stripLoader(fs.readFileSync(file, 'utf8')));
         }
     }
-    clearMergedJs(project.root);
     return project;
 }
 

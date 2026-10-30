@@ -74,7 +74,9 @@ bin/magento static:optimize:init [--force]   # write static-optimize.json with t
   Fewer requests, but every page then downloads that code, needed or not. `0` (default) never merges.
 - `--json report.json` (`check`): full analysis as JSON.
 - `--node`: Node.js binary when `node` is not in the `PATH`.
-- `--no-version-refresh`: keep the static content version (see above).
+- `--no-version-refresh`: keep the static content version (see above). Refresh it yourself after the
+  run: with `dev/js/merge_files` on, pages keep their merged JS file (and the old loader) until the
+  version changes, as Magento names merged files after it.
 - `-v`: engine details, and keeps the context file for debugging.
 
 ### Configuration: `static-optimize.json`

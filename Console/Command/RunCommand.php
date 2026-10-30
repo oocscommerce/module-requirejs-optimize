@@ -191,14 +191,15 @@ class RunCommand extends Command
      */
     protected function refreshStaticVersion(OutputInterface $output): void
     {
-        if (!$this->staticVersion->isSigned()) {
-            $output->writeln('<comment>dev/static/sign is off: browsers and CDNs may keep the old'
-                . ' requirejs-config.js until their cache expires.</comment>');
-            return;
-        }
+        // also names merged JS files (dev/js/merge_files): new pages get new ones with the new
+        // requirejs-config.js, pages still cached keep loading the previous ones
         $version = $this->staticVersion->refresh();
         $output->writeln("<comment>Static content version is now {$version}:"
             . ' flush the full page cache and purge Varnish/CDN.</comment>');
+        if (!$this->staticVersion->isSigned()) {
+            $output->writeln('<comment>dev/static/sign is off: static URLs carry no version, browsers and CDNs'
+                . ' may keep the old requirejs-config.js until their cache expires.</comment>');
+        }
     }
 
     /**
