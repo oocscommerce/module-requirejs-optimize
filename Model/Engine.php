@@ -70,14 +70,14 @@ class Engine
             throw new LocalizedException(__(
                 'Node.js not found (%1). Install Node.js %2+ or pass --node=/path/to/node.',
                 $node,
-                self::MIN_NODE_MAJOR
+                static::MIN_NODE_MAJOR
             ));
         }
         $version = trim($process->getOutput());
-        if ((int)ltrim($version, 'v') < self::MIN_NODE_MAJOR) {
-            throw new LocalizedException(__('Node.js %1+ is required, found %2.', self::MIN_NODE_MAJOR, $version));
+        if ((int)ltrim($version, 'v') < static::MIN_NODE_MAJOR) {
+            throw new LocalizedException(__('Node.js %1+ is required, found %2.', static::MIN_NODE_MAJOR, $version));
         }
-        if (!$this->file->isFile($this->getDir() . '/dist/' . self::SCRIPT)
+        if (!$this->file->isFile($this->getDir() . '/dist/' . static::SCRIPT)
             && !$this->file->isDirectory($this->getDir() . '/node_modules')
         ) {
             throw new LocalizedException(__('Engine not built: run "npm ci && npm run dist" in %1', $this->getDir()));
@@ -106,7 +106,7 @@ class Engine
         callable $write,
         bool $keep
     ): array {
-        $dir = $this->directoryList->getPath(DirectoryList::TMP) . '/' . self::TMP_DIR;
+        $dir = $this->directoryList->getPath(DirectoryList::TMP) . '/' . static::TMP_DIR;
         $this->file->createDirectory($dir);
         $contextFile = $dir . '/context-' . $name . '.json';
         $this->file->filePutContents($contextFile, json_encode($context, JSON_UNESCAPED_SLASHES));
@@ -149,7 +149,7 @@ class Engine
      */
     protected function getScript(): string
     {
-        $dist = $this->getDir() . '/dist/' . self::SCRIPT;
-        return $this->file->isFile($dist) ? $dist : $this->getDir() . '/bin/' . self::SCRIPT;
+        $dist = $this->getDir() . '/dist/' . static::SCRIPT;
+        return $this->file->isFile($dist) ? $dist : $this->getDir() . '/bin/' . static::SCRIPT;
     }
 }

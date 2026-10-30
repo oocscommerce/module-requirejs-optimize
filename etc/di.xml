@@ -19,6 +19,7 @@
             <argument name="contextBuilder" xsi:type="object">OOCS\RequireJsOptimize\Model\ContextBuilder\Proxy</argument>
             <argument name="targetList" xsi:type="object">OOCS\RequireJsOptimize\Model\TargetList\Proxy</argument>
             <argument name="staticVersion" xsi:type="object">OOCS\RequireJsOptimize\Model\StaticVersion\Proxy</argument>
+            <argument name="sri" xsi:type="object">OOCS\RequireJsOptimize\Model\Sri\Proxy</argument>
         </arguments>
     </type>
 </config>

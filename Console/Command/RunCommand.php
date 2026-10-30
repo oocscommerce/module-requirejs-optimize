@@ -11,6 +11,7 @@ use Magento\Framework\Exception\LocalizedException;
 use OOCS\RequireJsOptimize\Model\ContextBuilder;
 use OOCS\RequireJsOptimize\Model\Engine;
 use OOCS\RequireJsOptimize\Model\PageConfig;
+use OOCS\RequireJsOptimize\Model\Sri;
 use OOCS\RequireJsOptimize\Model\StaticVersion;
 use OOCS\RequireJsOptimize\Model\TargetList;
 use Symfony\Component\Console\Command\Command;
@@ -54,6 +55,11 @@ class RunCommand extends Command
     protected $staticVersion;
 
     /**
+     * @var Sri
+     */
+    protected $sri;
+
+    /**
      * Inject dependencies.
      *
      * @param TargetList $targetList
@@ -61,6 +67,7 @@ class RunCommand extends Command
      * @param PageConfig $pageConfig
      * @param Engine $engine
      * @param StaticVersion $staticVersion
+     * @param Sri $sri
      * @param string|null $name
      */
     public function __construct(
@@ -69,6 +76,7 @@ class RunCommand extends Command
         PageConfig $pageConfig,
         Engine $engine,
         StaticVersion $staticVersion,
+        Sri $sri,
         ?string $name = null
     ) {
         $this->targetList = $targetList;
@@ -76,6 +84,7 @@ class RunCommand extends Command
         $this->pageConfig = $pageConfig;
         $this->engine = $engine;
         $this->staticVersion = $staticVersion;
+        $this->sri = $sri;
         parent::__construct($name);
     }
 
@@ -121,11 +130,11 @@ class RunCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $action = (string)$input->getArgument('action');
-        if (!in_array($action, self::ACTIONS, true)) {
+        if (!in_array($action, static::ACTIONS, true)) {
             $output->writeln(
-                sprintf('<error>Unknown action "%s", use %s</error>', $action, implode(' | ', self::ACTIONS))
+                sprintf('<error>Unknown action "%s", use %s</error>', $action, implode(' | ', static::ACTIONS))
             );
-            return self::EXIT_FAILURE;
+            return static::EXIT_FAILURE;
         }
         try {
             $config = $this->getConfig();
@@ -137,7 +146,7 @@ class RunCommand extends Command
             }
         } catch (LocalizedException $e) {
             $output->writeln('<error>' . $e->getMessage() . '</error>');
-            return self::EXIT_FAILURE;
+            return static::EXIT_FAILURE;
         }
         $output->writeln('<comment>page types from ' . ($this->pageConfig->exists()
             ? $this->pageConfig->getPath()
@@ -149,11 +158,13 @@ class RunCommand extends Command
             },
             $targets
         );
+        // checkout pages put integrity attributes on scripts: the edited requirejs-config.js needs its new hash
+        $this->sri->store();
         // only when static files changed: a new version empties browser and CDN caches of all static files
         if ($action !== 'check' && in_array(true, $results, true) && !$input->getOption('no-version-refresh')) {
             $this->refreshStaticVersion($output);
         }
-        return in_array(false, $results, true) ? self::EXIT_FAILURE : self::EXIT_SUCCESS;
+        return in_array(false, $results, true) ? static::EXIT_FAILURE : static::EXIT_SUCCESS;
     }
 
     /**
@@ -231,6 +242,9 @@ class RunCommand extends Command
         // kept with -v for debugging
         if ($output->isVerbose()) {
             $output->writeln("<comment>context kept: {$contextFile}</comment>");
+        }
+        if ($success && $action !== 'check') {
+            $this->sri->collect($this->targetList->getStaticDir($target['theme'], $target['locale']));
         }
         return $success;
     }

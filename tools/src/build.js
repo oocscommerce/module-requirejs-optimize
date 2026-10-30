@@ -256,33 +256,6 @@ function wrapLoader(code) {
     return MARK_START + '\n' + code.trim() + '\n' + MARK_END + '\n';
 }
 
-/**
- * Keeps Magento_Csp subresource integrity in sync: checkout pages put integrity
- * attributes on every script (window.sriHashes), so the edited requirejs-config.js
- * must get a new hash and chunks get their own.
- */
-function updateSri(project, changed, removedPrefix) {
-    const file = path.join(project.staticDir, 'sri-hashes.json');
-    if (!fs.existsSync(file)) {
-        return false;
-    }
-    const prefix = path.relative(path.join(project.root, 'pub/static'), project.staticDir).split(path.sep).join('/') + '/';
-    const hashes = JSON.parse(fs.readFileSync(file, 'utf8'));
-    for (const key of Object.keys(hashes)) {
-        if (key.startsWith(prefix + removedPrefix)) {
-            delete hashes[key];
-        }
-    }
-    for (const rel of changed) {
-        const abs = path.join(project.staticDir, rel);
-        if (fs.existsSync(abs)) {
-            hashes[prefix + rel] = 'sha256-' + crypto.createHash('sha256').update(fs.readFileSync(abs)).digest('base64');
-        }
-    }
-    fs.writeFileSync(file, JSON.stringify(hashes));
-    return true;
-}
-
 function stripLoader(src) {
     const a = src.indexOf(MARK_START);
     const b = src.indexOf(MARK_END);
@@ -448,10 +421,6 @@ async function build(opts) {
             fs.rmSync(path.join(outDir, f), {force: true});
         }
     }
-    const sriFiles = configFiles.concat([...keep]);
-    if (!updateSri(project, sriFiles, OUT_DIR + '/')) {
-        warnings.push('sri-hashes.json not found: if Magento_Csp SRI is used, checkout will reject the edited requirejs-config.js');
-    }
     const merged = clearMergedJs(project.root);
     if (merged) {
         warnings.push(`removed ${merged} merged JS file(s) from pub/static/_cache/merged (rebuilt by Magento with the loader)`);
@@ -481,7 +450,6 @@ function clean(opts) {
             fs.writeFileSync(file, stripLoader(fs.readFileSync(file, 'utf8')));
         }
     }
-    updateSri(project, ['requirejs-config.js', 'requirejs-config.min.js'], OUT_DIR + '/');
     clearMergedJs(project.root);
     return project;
 }

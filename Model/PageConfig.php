@@ -74,7 +74,7 @@ class PageConfig
      */
     public function getPath(): string
     {
-        return $this->directoryList->getRoot() . '/' . self::FILE;
+        return $this->directoryList->getRoot() . '/' . static::FILE;
     }
 
     /**
@@ -97,7 +97,7 @@ class PageConfig
     {
         $data = $this->getData();
         if ($data === null) {
-            return self::DEFAULT_PAGES;
+            return static::DEFAULT_PAGES;
         }
         $pages = $data['pages'] ?? null;
         if (!is_array($pages) || !$pages || $this->isList($pages)) {
@@ -186,7 +186,7 @@ class PageConfig
      */
     protected function error(string $message, array $args = []): LocalizedException
     {
-        return new LocalizedException(__('%1: %2', self::FILE, new Phrase($message, $args)));
+        return new LocalizedException(__('%1: %2', static::FILE, new Phrase($message, $args)));
     }
 
     /**
@@ -218,10 +218,10 @@ class PageConfig
         try {
             $data = $this->json->unserialize($this->file->fileGetContents($this->getPath()));
         } catch (\InvalidArgumentException $e) {
-            throw new LocalizedException(__('%1 is not valid JSON: %2', self::FILE, $e->getMessage()));
+            throw new LocalizedException(__('%1 is not valid JSON: %2', static::FILE, $e->getMessage()));
         }
         if (!is_array($data)) {
-            throw new LocalizedException(__('%1 must contain a JSON object', self::FILE));
+            throw new LocalizedException(__('%1 must contain a JSON object', static::FILE));
         }
         return $data;
     }
@@ -239,7 +239,7 @@ class PageConfig
             throw new LocalizedException(__('%1 already exists, use --force to overwrite it', $this->getPath()));
         }
         $content = json_encode(
-            ['exclude' => [], 'entries' => (object)[], 'pages' => self::DEFAULT_PAGES],
+            ['exclude' => [], 'entries' => (object)[], 'pages' => static::DEFAULT_PAGES],
             JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
         ) . "\n";
         $this->file->filePutContents($this->getPath(), $content);

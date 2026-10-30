@@ -175,7 +175,7 @@ class CmsContent
             $widgets++;
             $params = json_decode((string)$row['widget_parameters'], true) ?: [];
             $handle = $row['layout_handle'] ?: 'default';
-            if (!preg_match(self::CMS_BLOCK_WIDGET, $row['instance_type'])) {
+            if (!preg_match(static::CMS_BLOCK_WIDGET, $row['instance_type'])) {
                 $template = $params['template'] ?? ($row['page_template'] ?: null);
                 $this->addBlock($byHandle, $handle, $row['instance_type'], $template);
             } elseif (isset($blocks[(string)($params['block_id'] ?? '')])) {
@@ -209,7 +209,7 @@ class CmsContent
         foreach ($this->parseDirectives($content) as $params) {
             $class = $params['type'] ?? $params['class'] ?? null;
             $blockId = $params['block_id'] ?? $params['id'] ?? null;
-            if ($class && !preg_match(self::CMS_BLOCK_CLASS, $class)) {
+            if ($class && !preg_match(static::CMS_BLOCK_CLASS, $class)) {
                 $this->addBlock($byHandle, $handle, $class, $params['template'] ?? null);
             } elseif ($blockId !== null && isset($blocks[$blockId]) && !isset($seen[$blockId])) {
                 $this->addContent($byHandle, $handle, $blocks[$blockId], $blocks, $seen + [$blockId => true]);

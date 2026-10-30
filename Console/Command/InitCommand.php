@@ -67,11 +67,11 @@ class InitCommand extends Command
             $path = $this->pageConfig->writeDefault((bool)$input->getOption('force'));
         } catch (LocalizedException $e) {
             $output->writeln('<error>' . $e->getMessage() . '</error>');
-            return self::EXIT_FAILURE;
+            return static::EXIT_FAILURE;
         }
         $output->writeln("<info>Wrote {$path}</info>");
         $output->writeln('Add or remove page types there: "name": [layout handles of that page],'
             . ' then run bin/magento static:optimize:run');
-        return self::EXIT_SUCCESS;
+        return static::EXIT_SUCCESS;
     }
 }

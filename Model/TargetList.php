@@ -134,10 +134,10 @@ class TargetList
      */
     protected function getStoreTheme(StoreInterface $store): ?ThemeInterface
     {
-        $themeId = $this->design->getConfigurationDesignTheme(self::AREA, ['store' => $store]);
+        $themeId = $this->design->getConfigurationDesignTheme(static::AREA, ['store' => $store]);
         $theme = is_numeric($themeId)
             ? $this->themeProvider->getThemeById((int)$themeId)
-            : $this->themeProvider->getThemeByFullPath(self::AREA . '/' . $themeId);
+            : $this->themeProvider->getThemeByFullPath(static::AREA . '/' . $themeId);
         return $theme && $theme->getId() ? $theme : null;
     }
 
@@ -171,7 +171,7 @@ class TargetList
     public function getStaticDir(ThemeInterface $theme, string $locale): string
     {
         return $this->directoryList->getPath(DirectoryList::STATIC_VIEW)
-            . '/' . self::AREA . '/' . $theme->getThemePath() . '/' . $locale;
+            . '/' . static::AREA . '/' . $theme->getThemePath() . '/' . $locale;
     }
 
     /**
@@ -185,7 +185,7 @@ class TargetList
         try {
             $this->appState->getAreaCode();
         } catch (LocalizedException $e) {
-            $this->appState->setAreaCode(self::AREA);
+            $this->appState->setAreaCode(static::AREA);
         }
     }
 }

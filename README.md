@@ -16,7 +16,8 @@ Node engine in `tools/` parses JS and writes the chunks.
 - Chunks per page type (`common`, `product`, `cart_checkout`, ...); mixins and single-use dependencies merged with the module that uses them
 - Lazy modules stay lazy, merged per lazy root with their dependencies, mixins and knockout templates
 - `ifconfig` blocks follow the store configuration
-- Works with `merge_files`, `minify_files` (chunks become `*.min.js`) and Magento_Csp SRI hashes
+- Works with `merge_files`, `minify_files` (chunks become `*.min.js`) and Magento_Csp subresource integrity
+  (2.4.7+): hashes of the changed files are saved through Magento's own SRI storage
 - Falls back to single files when a chunk fails to load; rebuilds do not break pages being loaded
 - No `npm install` on the site: the engine ships as one file
 
@@ -53,7 +54,7 @@ bin/magento static:optimize:run        # build every theme/locale used by an act
 ## Usage
 
 Run `bin/magento static:optimize:run` after every `setup:static-content:deploy`: the deploy
-rewrites `requirejs-config.js` and `sri-hashes.json`, which removes the loader.
+rewrites `requirejs-config.js` and its subresource integrity hash, which removes the loader.
 
 `build` and `clean` end with a new static content version, as
 `setup:static-content:deploy --refresh-content-version-only` does, so browsers and CDNs load the new
@@ -120,7 +121,7 @@ a single file with all dependencies bundled, so sites need no `npm install`.
 | `tools/src/layout.js` | layout XML, templates, PHP blocks, CMS → JS entry points |
 | `tools/src/graph.js` | module dependency graph (acorn) |
 | `tools/src/analyze.js` | modules per page type, chunk proposal |
-| `tools/src/build.js` | chunk files, loader, SRI hashes, clean |
+| `tools/src/build.js` | chunk files, loader, clean |
 
 After changing `tools/src` or `tools/bin`, rebuild the single file and commit it:
 
