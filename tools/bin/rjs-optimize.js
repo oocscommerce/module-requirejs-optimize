@@ -57,7 +57,8 @@ function contextOpts(args) {
 
 async function runBuild(args, base) {
     // chunks are minified like the rest of the site's JS: dev/js/minify_files of the store view
-    const opts = {...base, minify: !!base.context.jsFlags['dev/js/minify_files'], minChunk: (args['min-chunk'] !== undefined && args['min-chunk'] !== true ? +args['min-chunk'] : 0) * 1024};
+    const opts = {...base, minify: !!base.context.jsFlags['dev/js/minify_files'], minChunk: (args['min-chunk'] !== undefined && args['min-chunk'] !== true ? +args['min-chunk'] : 0) * 1024,
+        maxChunk: (args['max-chunk'] !== undefined && args['max-chunk'] !== true ? +args['max-chunk'] : 0) * 1024};
     const t0 = Date.now();
     const {manifest, warnings} = await build(opts);
     console.log(`\nrjs-optimize build  ${opts.theme} / ${opts.locale}  (${Date.now() - t0} ms)`);
@@ -256,7 +257,7 @@ if (commands[cmd]) {
     console.error([
         'Engine of bin/magento static:optimize:run, which writes the context file and runs:',
         '  rjs-optimize check --context FILE [--json out.json] [--verbose]    analyse, change nothing',
-        '  rjs-optimize build --context FILE [--min-chunk 0]                 write chunks + loader into pub/static',
+        '  rjs-optimize build --context FILE [--min-chunk 0] [--max-chunk 0]  write chunks + loader into pub/static',
         '  rjs-optimize clean --context FILE                                  remove chunks + loader',
         '  [--pages pages.json] overrides the analysed page types'
     ].join('\n'));

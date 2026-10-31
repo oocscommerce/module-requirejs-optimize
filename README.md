@@ -63,7 +63,7 @@ page cache and Varnish/CDN are not purged: do it after the run.
 
 ```bash
 bin/magento static:optimize:run [build|check|clean] [--theme Vendor/theme] [--locale xx_XX]
-        [--min-chunk 0] [--json report.json] [--node /path/to/node] [--no-version-refresh] [-v]
+        [--min-chunk 0] [--max-chunk 0] [--json report.json] [--node /path/to/node] [--no-version-refresh] [-v]
 bin/magento static:optimize:init [--force]   # write static-optimize.json with the default page types
 ```
 
@@ -72,6 +72,9 @@ bin/magento static:optimize:init [--force]   # write static-optimize.json with t
 - `--theme`, `--locale`: only this theme/locale; by default every one used by an active store view.
 - `--min-chunk N`: chunks shared by several page types and smaller than N KB are merged into `common`.
   Fewer requests, but every page then downloads that code, needed or not. `0` (default) never merges.
+- `--max-chunk N`: chunks larger than N KB of source are written as several files, requested together.
+  Each file is parsed and run in a shorter main-thread task (lower Total Blocking Time) at the cost of
+  a few more requests. `0` (default) never splits.
 - `--json report.json` (`check`): full analysis as JSON.
 - `--node`: Node.js binary when `node` is not in the `PATH`.
 - `--no-version-refresh`: keep the static content version (see above). Refresh it yourself after the
@@ -85,6 +88,8 @@ Optional, in the Magento root; `bin/magento static:optimize:init` writes it with
 
 ```json
 {
+    "minChunk": 0,
+    "maxChunk": 0,
     "exclude": ["Vendor_Slider/js/*"],
     "entries": {"home": ["Magento_PageBuilder/js/widget-initializer"]},
     "pages": {
@@ -102,6 +107,8 @@ Optional, in the Magento root; `bin/magento static:optimize:init` writes it with
   using the theme/locale: flag on -> bundled like any block, off -> not rendered so its JS is
   ignored, different values between those store views -> its JS stays single files. Run
   `static:optimize:run` again after changing such a setting.
+- `minChunk`, `maxChunk`: defaults of `--min-chunk` and `--max-chunk` (KB, `0` = off); the command
+  line options win when given.
 - `exclude`: module ids never bundled (`*` matches anything, `/` included); they load as single
   files, e.g. a third-party module that breaks inside a bundle.
 - `entries`: extra entry modules per page type for JS the static analysis cannot find (added by

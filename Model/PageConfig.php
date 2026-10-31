@@ -110,6 +110,22 @@ class PageConfig
     }
 
     /**
+     * Chunk size limit in KB (minChunk, maxChunk), 0 when not set.
+     *
+     * @param string $key
+     * @return int
+     * @throws LocalizedException when the value is not a whole number of KB >= 0
+     */
+    public function getChunkSize(string $key): int
+    {
+        $value = ($this->getData() ?? [])[$key] ?? 0;
+        if (!is_int($value) || $value < 0) {
+            throw $this->error('"%1" must be a whole number of KB, 0 or more', [$key]);
+        }
+        return $value;
+    }
+
+    /**
      * Module ids never bundled ("*" wildcard).
      *
      * @return string[]
@@ -239,7 +255,13 @@ class PageConfig
             throw new LocalizedException(__('%1 already exists, use --force to overwrite it', $this->getPath()));
         }
         $content = json_encode(
-            ['exclude' => [], 'entries' => (object)[], 'pages' => static::DEFAULT_PAGES],
+            [
+                'minChunk' => 0,
+                'maxChunk' => 0,
+                'exclude' => [],
+                'entries' => (object)[],
+                'pages' => static::DEFAULT_PAGES,
+            ],
             JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
         ) . "\n";
         $this->file->filePutContents($this->getPath(), $content);

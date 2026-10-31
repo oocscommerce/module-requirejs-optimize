@@ -106,8 +106,15 @@ class RunCommand extends Command
                 'min-chunk',
                 null,
                 InputOption::VALUE_REQUIRED,
-                'Shared chunks below this size (KB) merge into common (0 = never)',
-                '0'
+                'Shared chunks below this size (KB) merge into common (0 = never; default: minChunk of '
+                . PageConfig::FILE . ', else 0)'
+            )
+            ->addOption(
+                'max-chunk',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Chunks above this source size (KB) are split into parts loaded together (0 = never; default:'
+                . ' maxChunk of ' . PageConfig::FILE . ', else 0)'
             )
             ->addOption('json', null, InputOption::VALUE_REQUIRED, 'check: write the full report to this file')
             ->addOption('node', null, InputOption::VALUE_REQUIRED, 'Node.js binary', 'node')
@@ -180,6 +187,8 @@ class RunCommand extends Command
             'pages' => $pages,
             'exclude' => $this->pageConfig->getExclude(),
             'entries' => (object)$this->pageConfig->getEntries($pages),
+            'minChunk' => $this->pageConfig->getChunkSize('minChunk'),
+            'maxChunk' => $this->pageConfig->getChunkSize('maxChunk'),
         ];
     }
 
@@ -234,7 +243,7 @@ class RunCommand extends Command
             $action,
             str_replace('/', '_', $themePath) . '-' . $target['locale'],
             $config + $this->contextBuilder->build($target),
-            $this->getEngineArgs($action, $input, $output),
+            $this->getEngineArgs($action, $input, $output, $config),
             static function (string $data) use ($output) {
                 $output->write($data);
             },
@@ -256,13 +265,22 @@ class RunCommand extends Command
      * @param string $action
      * @param InputInterface $input
      * @param OutputInterface $output
+     * @param array $config
      * @return string[]
      */
-    protected function getEngineArgs(string $action, InputInterface $input, OutputInterface $output): array
-    {
+    protected function getEngineArgs(
+        string $action,
+        InputInterface $input,
+        OutputInterface $output,
+        array $config
+    ): array {
         $args = [];
         if ($action === 'build') {
-            $args = ['--min-chunk', (string)$input->getOption('min-chunk')];
+            // command line first, then static-optimize.json
+            $args = [
+                '--min-chunk', (string)($input->getOption('min-chunk') ?? $config['minChunk']),
+                '--max-chunk', (string)($input->getOption('max-chunk') ?? $config['maxChunk']),
+            ];
         }
         if ($action === 'check' && $input->getOption('json')) {
             $args = ['--json', (string)$input->getOption('json')];

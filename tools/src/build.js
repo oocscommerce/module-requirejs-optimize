@@ -171,6 +171,25 @@ function nameLazyChunks(chunks, graph, namer) {
     return names;
 }
 
+/**
+ * Splits the modules of a chunk into consecutive segments of at most maxSize bytes (source size);
+ * 0 keeps one segment. A module larger than maxSize gets a segment of its own.
+ */
+function splitParts(parts, ids, sizes, maxSize) {
+    const segments = [];
+    let cur = null;
+    for (let i = 0; i < parts.length; i++) {
+        if (!cur || (maxSize > 0 && cur.size > 0 && cur.size + sizes[i] > maxSize)) {
+            cur = {parts: [], ids: [], size: 0};
+            segments.push(cur);
+        }
+        cur.parts.push(parts[i]);
+        cur.ids.push(ids[i]);
+        cur.size += sizes[i];
+    }
+    return segments;
+}
+
 /** Merges chunks smaller than minSize that span several pages into `common`. */
 function mergeSmallChunks(chunks, minSize) {
     const common = chunks.find((c) => c.sig === '*');
@@ -189,11 +208,12 @@ function mergeSmallChunks(chunks, minSize) {
     return out;
 }
 
-function loaderSource(chunkFiles, moduleMap) {
+function loaderSource(chunkFiles, moduleMap, chunkGroups) {
     return `(function (require) {
     'use strict';
     var chunks = ${JSON.stringify(chunkFiles)},
         map = ${JSON.stringify(moduleMap)},
+        groups = ${JSON.stringify(chunkGroups || {})},
         state = {},
         load = require.load;
 
@@ -202,6 +222,12 @@ function loaderSource(chunkFiles, moduleMap) {
 
         if (!s) {
             s = state[i] = {waiting: [], node: null};
+            // parts of a split chunk are requested together
+            (groups[i] || []).forEach(function (j) {
+                if (j !== i) {
+                    loadChunk(context, j);
+                }
+            });
             // nameToUrl like any module: Magento's min resolver turns it into *.min.js when
             // JS minification is on, and urlArgs/baseUrl apply as usual
             s.node = load(context, '_rjso_' + i, context.nameToUrl(chunks[i]));
@@ -311,9 +337,11 @@ async function build(opts) {
 
     const moduleMap = {};
     const chunkFiles = [];
+    const chunkGroups = {};
     for (const c of chunks) {
         const parts = [];
         const included = [];
+        const partSizes = [];
         let rawSize = 0;
         for (const id of c.modules) {
             if (excluded(id)) {
@@ -325,6 +353,7 @@ async function build(opts) {
             if (n.plugin === 'text') {
                 parts.push(textDefine(id, src));
                 included.push(id);
+                partSizes.push(n.size);
                 rawSize += n.size;
                 continue;
             }
@@ -340,30 +369,45 @@ async function build(opts) {
             // a statement boundary between files that may lack a trailing semicolon/newline
             parts.push(res.code + '\n;');
             included.push(id);
+            partSizes.push(n.size);
             rawSize += n.size;
         }
         if (!included.length) {
             continue;
         }
         const name = names.get(c.sig);
-        let code = parts.join('\n');
-        if (opts.minify) {
-            code = await minify(code, name, warnings);
-        }
-        const hash = crypto.createHash('md5').update(code).digest('hex').slice(0, 8);
-        const rel = `${OUT_DIR}/${name}.${hash}`;
-        // named like the site's other static JS: *.min.js when dev/js/minify_files is on
-        const file = rel + (opts.minify ? '.min.js' : '.js');
-        fs.writeFileSync(path.join(staticDir, file), code);
-        const chunkIndex = chunkFiles.length;
-        chunkFiles.push(rel);
-        for (const id of included) {
-            if (!id.startsWith('text!')) {
-                moduleMap[id] = chunkIndex;
+        // a chunk over --max-chunk is written as several files, loaded together: shorter
+        // main-thread tasks to parse and run each (less TBT), no extra request round
+        const segments = splitParts(parts, included, partSizes, opts.maxChunk);
+        const group = segments.length > 1 ? [] : null;
+        for (let k = 0; k < segments.length; k++) {
+            const seg = segments[k];
+            const segName = segments.length > 1 ? `${name}-${k + 1}` : name;
+            let code = seg.parts.join('\n');
+            if (opts.minify) {
+                code = await minify(code, segName, warnings);
             }
+            const hash = crypto.createHash('md5').update(code).digest('hex').slice(0, 8);
+            const rel = `${OUT_DIR}/${segName}.${hash}`;
+            // named like the site's other static JS: *.min.js when dev/js/minify_files is on
+            const file = rel + (opts.minify ? '.min.js' : '.js');
+            fs.writeFileSync(path.join(staticDir, file), code);
+            const chunkIndex = chunkFiles.length;
+            chunkFiles.push(rel);
+            if (group) {
+                group.push(chunkIndex);
+            }
+            for (const id of seg.ids) {
+                if (!id.startsWith('text!')) {
+                    moduleMap[id] = chunkIndex;
+                }
+            }
+            results.push({name: segName, file, pages: c.pages || [], lazy: !!c.lazy, roots: c.roots,
+                modules: seg.ids.length, ids: seg.ids, rawSize: seg.size, size: Buffer.byteLength(code)});
         }
-        results.push({name, file, pages: c.pages || [], lazy: !!c.lazy, roots: c.roots,
-            modules: included.length, ids: included, rawSize, size: Buffer.byteLength(code)});
+        if (group) {
+            group.forEach((i) => { chunkGroups[i] = group; });
+        }
     }
 
     // page -> chunk files, for per-page preloading
@@ -385,7 +429,7 @@ async function build(opts) {
     manifest.previous = previousFiles;
     fs.writeFileSync(path.join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
 
-    const loader = loaderSource(chunkFiles, moduleMap);
+    const loader = loaderSource(chunkFiles, moduleMap, chunkGroups);
     const configFiles = ['requirejs-config.js', 'requirejs-config.min.js'];
     for (const f of configFiles) {
         const file = path.join(staticDir, f);
