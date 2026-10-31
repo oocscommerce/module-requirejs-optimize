@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.0
+
+- `--progressive` (`progressive` in `static-optimize.json`): bundled modules are defined in slices of about 15 ms, freeing the main thread in between (lower Total Blocking Time). Off by default.
+- `--max-chunk`: chunks above this source size are split into parts loaded together.
+- `minChunk`, `maxChunk` in `static-optimize.json`: defaults of `--min-chunk` and `--max-chunk`.
+
 ## 1.1.0
 
 - PHP 7.2+: no PHP 7.3/8 syntax, own exit codes instead of `Command::SUCCESS/FAILURE` (Symfony Console 5.1+), Composer 1 class loaders supported. Properties, methods and constants are protected so a preference can extend the classes.

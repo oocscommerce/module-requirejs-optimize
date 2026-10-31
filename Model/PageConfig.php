@@ -126,6 +126,22 @@ class PageConfig
     }
 
     /**
+     * Boolean option of the config file, false when not set.
+     *
+     * @param string $key
+     * @return bool
+     * @throws LocalizedException when the value is not true or false
+     */
+    public function getFlag(string $key): bool
+    {
+        $value = ($this->getData() ?? [])[$key] ?? false;
+        if (!is_bool($value)) {
+            throw $this->error('"%1" must be true or false', [$key]);
+        }
+        return $value;
+    }
+
+    /**
      * Module ids never bundled ("*" wildcard).
      *
      * @return string[]
@@ -258,6 +274,7 @@ class PageConfig
             [
                 'minChunk' => 0,
                 'maxChunk' => 0,
+                'progressive' => false,
                 'exclude' => [],
                 'entries' => (object)[],
                 'pages' => static::DEFAULT_PAGES,

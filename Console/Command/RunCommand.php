@@ -116,6 +116,13 @@ class RunCommand extends Command
                 'Chunks above this source size (KB) are split into parts loaded together (0 = never; default:'
                 . ' maxChunk of ' . PageConfig::FILE . ', else 0)'
             )
+            ->addOption(
+                'progressive',
+                null,
+                InputOption::VALUE_NONE,
+                'Define bundled modules in time slices, freeing the main thread in between (lower TBT);'
+                . ' default: progressive of ' . PageConfig::FILE
+            )
             ->addOption('json', null, InputOption::VALUE_REQUIRED, 'check: write the full report to this file')
             ->addOption('node', null, InputOption::VALUE_REQUIRED, 'Node.js binary', 'node')
             ->addOption(
@@ -189,6 +196,7 @@ class RunCommand extends Command
             'entries' => (object)$this->pageConfig->getEntries($pages),
             'minChunk' => $this->pageConfig->getChunkSize('minChunk'),
             'maxChunk' => $this->pageConfig->getChunkSize('maxChunk'),
+            'progressive' => $this->pageConfig->getFlag('progressive'),
         ];
     }
 
@@ -281,6 +289,9 @@ class RunCommand extends Command
                 '--min-chunk', (string)($input->getOption('min-chunk') ?? $config['minChunk']),
                 '--max-chunk', (string)($input->getOption('max-chunk') ?? $config['maxChunk']),
             ];
+            if ($input->getOption('progressive') || $config['progressive']) {
+                $args[] = '--progressive';
+            }
         }
         if ($action === 'check' && $input->getOption('json')) {
             $args = ['--json', (string)$input->getOption('json')];

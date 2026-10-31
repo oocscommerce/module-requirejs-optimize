@@ -58,7 +58,8 @@ function contextOpts(args) {
 async function runBuild(args, base) {
     // chunks are minified like the rest of the site's JS: dev/js/minify_files of the store view
     const opts = {...base, minify: !!base.context.jsFlags['dev/js/minify_files'], minChunk: (args['min-chunk'] !== undefined && args['min-chunk'] !== true ? +args['min-chunk'] : 0) * 1024,
-        maxChunk: (args['max-chunk'] !== undefined && args['max-chunk'] !== true ? +args['max-chunk'] : 0) * 1024};
+        maxChunk: (args['max-chunk'] !== undefined && args['max-chunk'] !== true ? +args['max-chunk'] : 0) * 1024,
+        progressive: !!args.progressive};
     const t0 = Date.now();
     const {manifest, warnings} = await build(opts);
     console.log(`\nrjs-optimize build  ${opts.theme} / ${opts.locale}  (${Date.now() - t0} ms)`);

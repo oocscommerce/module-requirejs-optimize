@@ -172,6 +172,31 @@ function nameLazyChunks(chunks, graph, namer) {
 }
 
 /**
+ * Modules of a chunk with their dependencies in the chunk first, so modules become ready one by one
+ * as the loader defines them (lazy edges ignored).
+ */
+function orderByDeps(ids, graph) {
+    const inChunk = new Set(ids);
+    const out = [];
+    const state = new Map();
+    const visit = (id) => {
+        if (state.has(id)) {
+            return;
+        }
+        state.set(id, 1);
+        const n = graph.nodes.get(id);
+        for (const e of (n ? n.edges : [])) {
+            if (e.kind !== 'lazy' && inChunk.has(e.to)) {
+                visit(e.to);
+            }
+        }
+        out.push(id);
+    };
+    ids.forEach(visit);
+    return out;
+}
+
+/**
  * Splits the modules of a chunk into consecutive segments of at most maxSize bytes (source size);
  * 0 keeps one segment. A module larger than maxSize gets a segment of its own.
  */
@@ -221,7 +246,7 @@ function loaderSource(chunkFiles, moduleMap, chunkGroups) {
         var s = state[i];
 
         if (!s) {
-            s = state[i] = {waiting: [], node: null};
+            s = state[i] = {waiting: [], node: null, context: context};
             // parts of a split chunk are requested together
             (groups[i] || []).forEach(function (j) {
                 if (j !== i) {
@@ -259,6 +284,57 @@ function loaderSource(chunkFiles, moduleMap, chunkGroups) {
             return load.apply(this, arguments);
         }
         loadChunk(context, i, [context, moduleName, url]);
+    };
+
+    // --progressive chunks: modules are defined in slices of about SLICE ms; between slices the main thread
+    // is free (input, rendering), as when modules arrive one by one over the network
+    var SLICE = 15,
+        queue = [],
+        running = false;
+
+    function later(fn) {
+        if (window.scheduler && window.scheduler.yield) {
+            window.scheduler.yield().then(fn);
+        } else if (window.MessageChannel) {
+            var channel = new MessageChannel();
+
+            channel.port1.onmessage = fn;
+            channel.port2.postMessage(0);
+        } else {
+            setTimeout(fn, 0);
+        }
+    }
+
+    function slice() {
+        var start = Date.now(),
+            item,
+            context;
+
+        while (queue.length) {
+            item = queue[0];
+            context = (state[item.i] && state[item.i].context) || require.s.contexts._;
+            while (item.pos < item.fns.length && Date.now() - start < SLICE) {
+                item.fns[item.pos++].call(window);
+            }
+            if (item.pos >= item.fns.length) {
+                queue.shift();
+            }
+            // RequireJS takes the defines made so far and runs the modules that are now ready
+            context.completeLoad('_rjso_' + item.i);
+            if (Date.now() - start >= SLICE) {
+                later(slice);
+                return;
+            }
+        }
+        running = false;
+    }
+
+    require.rjsOptimizeChunk = function (i, fns) {
+        queue.push({i: i, fns: fns, pos: 0});
+        if (!running) {
+            running = true;
+            later(slice);
+        }
     };
 
     /** Starts downloading the chunks a page will need, before RequireJS discovers them. */
@@ -343,7 +419,7 @@ async function build(opts) {
         const included = [];
         const partSizes = [];
         let rawSize = 0;
-        for (const id of c.modules) {
+        for (const id of (opts.progressive ? orderByDeps(c.modules, graph) : c.modules)) {
             if (excluded(id)) {
                 skipped.push({id, reason: 'excluded in static-optimize.json'});
                 continue;
@@ -383,7 +459,12 @@ async function build(opts) {
         for (let k = 0; k < segments.length; k++) {
             const seg = segments[k];
             const segName = segments.length > 1 ? `${name}-${k + 1}` : name;
-            let code = seg.parts.join('\n');
+            // --progressive: each module in a function the loader calls in time slices, the script itself
+            // only builds the list (V8 compiles a function when first called)
+            let code = opts.progressive
+                ? `require.rjsOptimizeChunk(${chunkFiles.length}, [\n`
+                    + seg.parts.map((pt) => 'function () {\n' + pt + '\n}').join(',\n') + '\n]);'
+                : seg.parts.join('\n');
             if (opts.minify) {
                 code = await minify(code, segName, warnings);
             }
